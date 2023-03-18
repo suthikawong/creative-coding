@@ -1,4 +1,6 @@
 const canvasSketch = require('canvas-sketch')
+const math = require('canvas-sketch-util/math')
+const random = require('canvas-sketch-util/random')
 
 const settings = {
     dimensions: [1080, 1080],
@@ -25,22 +27,18 @@ const sketch = () => {
         const i = 3
 
         for (let i = 0; i < num; i++) {
-            const slice = redToDeg(360 / num)
+            const slice = math.degToRad(360 / num)
             const angle = slice * i
 
             x = cx + radius * Math.sin(angle)
             y = cy + radius * Math.cos(angle)
-            // console.log('radius : ', radius)
-            // console.log('sin : ', Math.sin(angle))
-            // console.log('cos : ', Math.cos(angle))
-            // console.log('x : ', x)
-            // console.log('y : ', y)
-            // console.log('angle : ', angle)
 
             context.save()
             // จุดหมุนของแท่งสี่เหลี่ยม
             context.translate(x, y)
             context.rotate(-angle)
+            // ทำให้ random อยู่ในช่วง 1-3
+            context.scale(random.range(1, 3), 1)
             context.beginPath()
             context.rect(-w * 0.5, -h * 0.5, w, h)
             context.fill()
@@ -49,8 +47,16 @@ const sketch = () => {
     }
 }
 
-const redToDeg = (degrees) => {
-    return (degrees / 180) * Math.PI
-}
+// const randomRange = (min, max) => {
+//     // ทำให้ random อยู่ในช่วง 1-3
+//     // Math.random() จำคืนใช่วง 0-1 เรา + 1 ตอนท้ายเพื่อ offset ไม่ให้เป็น 0
+//     // และให้คูณด้วย 2 เพื่อที่เมื่อบวก 1 จะได้ค่า max = 3
+//     // context.scale(Math.random() * (3 - 1) + 1, 1)
+//     return Math.random() * (max - min) + min
+// }
+
+// const degToRad = (degrees) => {
+//     return (degrees / 180) * Math.PI
+// }
 
 canvasSketch(sketch, settings)
