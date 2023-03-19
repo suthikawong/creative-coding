@@ -8,23 +8,29 @@ let text = 'A'
 let fontSize = 1200
 let fontFamily = 'serif'
 
-const sketch = () => {
+const typeCanvas = document.createElement('canvas')
+const typeContext = typeCanvas.getContext('2d')
+
+const sketch = ({ context, width, height }) => {
+    const cell = 20 // กว้างและสูง 20px ต่อ 1 cell
+    const cols = Math.floor(width / cell)
+    const rows = Math.floor(height / cell)
+    const numCells = cols * rows
+
+    typeCanvas.width = cols
+    typeCanvas.height = rows
+
     return ({ context, width, height }) => {
-        context.fillStyle = 'white'
-        context.fillRect(0, 0, width, height)
+        typeContext.fillStyle = 'black'
+        typeContext.fillRect(0, 0, cols, rows)
 
-        context.fillStyle = 'black'
-        context.font = `${fontSize}px ${fontFamily}`
-        context.textBaseline = 'top'
-        // context.textAlign = 'center' // ใช้ได้บางครั้ง แต่ไม่ได้แม่นยำ
+        fontSize = cols
 
-        const metrics = context.measureText(text)
-        // alignment (default ซ้ายสุด เปลี่ยนแปลงตาม translate)
-        // baseline (default บนสุด เปลี่ยนแปลงตาม translate)
-        // actualBoundingBoxLeft: ระยะระหว่างจุด alignment ถึงขอบซ้ายของอักษร
-        // actualBoundingBoxAscent: ระยะระหว่าง baseline ถึงขอบบนของอักษร
-        // actualBoundingBoxRight: ระยะระหว่างจุด alignment ถึงขอบขวาของอักษร
-        // actualBoundingBoxDescent: ระยะระหว่าง baseline ถึงขอบล่างของอักษร
+        typeContext.fillStyle = 'white'
+        typeContext.font = `${fontSize}px ${fontFamily}`
+        typeContext.textBaseline = 'top'
+
+        const metrics = typeContext.measureText(text)
         const mx = metrics.actualBoundingBoxLeft * -1
         const my = metrics.actualBoundingBoxAscent * -1
         const mw =
@@ -32,18 +38,41 @@ const sketch = () => {
         const mh =
             metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent
 
-        const x = (width - mw) * 0.5 - mx
-        // ต้องลบด้วย my เพราะมีค่า actualBoundingBoxAscent ซึ่งทำให้ตัวอักษรมี offset จาก baseline
-        // ถ้าเราใช้ค่า y ไปคำนวนโดยไม่ลบด้วย my ตอน translate จะทำให้มีการรวม offset ของเดิมด้วยและอักษรจะไม่อยู่ตรงกลาง
-        const y = (height - mh) * 0.5 - my
+        const tx = (cols - mw) * 0.5 - mx
+        const ty = (rows - mh) * 0.5 - my
 
-        context.save()
-        context.translate(x, y)
-        context.beginPath()
-        // context.rect(mx, my, mw, mh) // ใช้ log stroke รอบตัวอักษร
-        context.stroke()
-        context.fillText(text, 0, 0)
-        context.restore()
+        typeContext.save()
+        typeContext.translate(tx, ty)
+        typeContext.beginPath()
+        typeContext.stroke()
+        typeContext.fillText(text, 0, 0)
+        typeContext.restore()
+
+        const typeData = typeContext.getImageData(0, 0, cols, rows).data
+
+        context.drawImage(typeCanvas, 0, 0)
+
+        for (let i = 0; i < numCells; i++) {
+            const col = i % cols
+            const row = Math.floor(i / cols)
+            const x = col * cell
+            const y = row * cell
+
+            const r = typeData[i * 4 + 0] // first channel
+            const g = typeData[i * 4 + 1] // second channel
+            const b = typeData[i * 4 + 2] // third channel
+            const a = typeData[i * 4 + 3] // forth channel
+
+            context.fillStyle = `rgb(${r}, ${g}, ${b})`
+
+            context.save()
+            context.translate(x, y)
+            context.beginPath()
+            // context.fillRect(0, 0, cell, cell)
+            context.arc(0, 0, cell * 0.5, 0, Math.PI * 2)
+            context.fill()
+            context.restore()
+        }
     }
 }
 
