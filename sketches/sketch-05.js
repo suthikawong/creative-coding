@@ -3,7 +3,7 @@ const canvasSketch = require('canvas-sketch')
 const settings = {
     dimensions: [1080, 1080],
 }
-
+let manager
 let text = 'A'
 let fontSize = 1200
 let fontFamily = 'serif'
@@ -47,4 +47,14 @@ const sketch = () => {
     }
 }
 
-canvasSketch(sketch, settings)
+const onKeyUp = (e) => {
+    text = e.key.toUpperCase()
+    manager.render()
+}
+
+document.addEventListener('keyup', onKeyUp)
+
+const start = async () => {
+    manager = await canvasSketch(sketch, settings)
+}
+start()
