@@ -64,6 +64,7 @@ const sketch = ({ context, width, height }) => {
             const x = col * cell
             const y = row * cell
 
+            // จะใช้ nested loop ของ row, col ก็ได้ แต่ต้องเปลี่ยน i เป็น (row * 54 + col) ด้วยเพราะ bitmap คือมาเป็น array 1 มิติ
             const r = typeData[i * 4 + 0] // first channel
             const g = typeData[i * 4 + 1] // second channel
             const b = typeData[i * 4 + 2] // third channel
