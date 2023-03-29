@@ -18,6 +18,12 @@ const sketch = ({ context, width, height }) => {
     const rectColors = [random.pick(risoColors), random.pick(risoColors)]
 
     const bgColor = random.pick(risoColors).hex
+    const mask = {
+        radius: width * 0.4,
+        sides: 3,
+        x: width * 0.5,
+        y: height * 0.58,
+    }
 
     for (let i = 0; i < num; i++) {
         x = random.range(0, width)
@@ -34,11 +40,20 @@ const sketch = ({ context, width, height }) => {
         context.fillStyle = bgColor
         context.fillRect(0, 0, width, height)
 
+        context.save()
+
+        context.translate(mask.x, mask.y)
+        drawPolygon({ context, radius: mask.radius, sides: mask.sides })
+
+        // ทุกอย่างที่วาดหลังจากสามเหลี่ยม จะอยู่ภายในสามเหลี่ยม
+        context.clip()
+
         rects.forEach((rect) => {
             const { x, y, w, h, fill, stroke, blend } = rect
             let shadowColor
 
             context.save()
+            context.translate(-mask.x, -mask.y)
             context.translate(x, y)
             context.strokeStyle = stroke
             context.fillStyle = fill
@@ -68,6 +83,23 @@ const sketch = ({ context, width, height }) => {
 
             context.restore()
         })
+
+        context.restore()
+
+        // ทำให้ stroke ไม่โดนทับโดยสี่เหลี่ยมข้างใน
+        context.save()
+        context.translate(mask.x, mask.y)
+        context.lineWidth = 20
+        drawPolygon({
+            context,
+            radius: mask.radius - context.lineWidth,
+            sides: mask.sides,
+        })
+        // ทำให้มีการเห็นเส้นจากสี่เหลี่ยมในสามเหลี่ยม
+        context.globalCompositeOperation = 'color-burn'
+        context.strokeStyle = rectColors[0].hex
+        context.stroke()
+        context.restore()
     }
 }
 
@@ -88,6 +120,20 @@ const drawSkewedRect = ({ context, w = 600, h = 200, degrees = -45 }) => {
     context.closePath()
 
     context.restore()
+}
+
+const drawPolygon = ({ context, radius = 100, sides = 3 }) => {
+    // หาว่าแต่ละด้านจะมีมุมเป็นกี่เรเดียน
+    const slice = (Math.PI * 2) / sides
+    context.beginPath()
+    context.moveTo(0, -radius)
+
+    for (let i = 1; i < sides; i++) {
+        // - Math.PI * 0.5 เพื่อให้ 0 องศาเริ่มที่ 12 นาฬิกา (ปกติ 0 องศาเริ่มที่ 3 นาฬิกา)
+        const theta = i * slice - Math.PI * 0.5
+        context.lineTo(radius * Math.cos(theta), radius * Math.sin(theta))
+    }
+    context.closePath()
 }
 
 canvasSketch(sketch, settings)
