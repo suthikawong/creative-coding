@@ -11,8 +11,10 @@ let points
 const sketch = ({ canvas }) => {
     points = [
         new Point({ x: 200, y: 540 }),
-        new Point({ x: 400, y: 300, control: true }),
+        new Point({ x: 400, y: 700 }),
         new Point({ x: 800, y: 540 }),
+        new Point({ x: 600, y: 700 }),
+        new Point({ x: 640, y: 900 }),
     ]
 
     canvas.addEventListener('mousedown', onMouseDown)
@@ -24,12 +26,34 @@ const sketch = ({ canvas }) => {
 
         context.beginPath()
         context.moveTo(points[0].x, points[0].y)
-        context.quadraticCurveTo(
-            points[1].x,
-            points[1].y,
-            points[2].x,
-            points[2].y
-        )
+
+        for (let i = 1; i < points.length; i++) {
+            context.lineTo(points[i].x, points[i].y)
+        }
+        context.stroke()
+
+        context.beginPath()
+        for (let i = 0; i < points.length - 1; i++) {
+            const curr = points[i]
+            const next = points[i + 1]
+
+            const mx = curr.x + (next.x - curr.x) * 0.5
+            const my = curr.y + (next.y - curr.y) * 0.5
+
+            // draw midpoints
+            // context.beginPath()
+            // context.fillStyle = 'blue'
+            // context.arc(mx, my, 5, 0, Math.PI * 2)
+            // context.fill()
+
+            if (i == 0) context.moveTo(curr.x, curr.y)
+            else if (i == points.length - 2)
+                context.quadraticCurveTo(curr.x, curr.y, next.x, next.y)
+            else context.quadraticCurveTo(curr.x, curr.y, mx, my)
+        }
+
+        context.lineWidth = 4
+        context.strokeStyle = 'blue'
         context.stroke()
 
         points.forEach((point) => {
@@ -45,9 +69,18 @@ const onMouseDown = (e) => {
     const x = (e.offsetX / elCanvas.offsetWidth) * elCanvas.width
     const y = (e.offsetY / elCanvas.offsetHeight) * elCanvas.height
 
+    let hit = false
     points.forEach((point) => {
         point.isDragging = point.hitTest(x, y)
+        if (!hit && point.isDragging) {
+            hit = true
+        }
     })
+
+    // ถ้าไม่ได้คลิกจุดเก่า ให้สร้างจุดใหม่
+    if (!hit) {
+        points.push(new Point({ x, y }))
+    }
 }
 
 const onMouseMove = (e) => {
