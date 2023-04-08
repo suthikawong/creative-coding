@@ -1,6 +1,8 @@
 const canvasSketch = require('canvas-sketch')
 const random = require('canvas-sketch-util/random')
+const math = require('canvas-sketch-util/math')
 const eases = require('eases')
+const colormap = require('colormap')
 
 const settings = {
     dimensions: [1080, 1080],
@@ -9,11 +11,14 @@ const settings = {
 
 const particles = []
 const cursor = { x: 9999, y: 9999 }
+const colors = colormap({
+    colormap: 'viridis',
+    nshades: 20,
+})
 let elCanvas
 
 const sketch = ({ width, height, canvas }) => {
     let x, y, particle, radius
-    let pos = []
     const numCircles = 15 // จำนวนวงกลมจากจุดศูนย์กลาง
     const gapCircle = 8
     const gapDot = 4
@@ -56,22 +61,12 @@ const sketch = ({ width, height, canvas }) => {
         dotRadius = (1 - eases.quadOut(i / numCircles)) * fitRadius
     }
 
-    // for (let i = 0; i < 200; i++) {
-    //     x = width * 0.5
-    //     y = height * 0.5
-
-    //     // สุ่มตำแหน่งที่อยู่ภายในวงกลมรัศมี 400 โดยจะคืนเป็น [x, y]
-    //     random.insideCircle(400, pos)
-    //     x += pos[0]
-    //     y += pos[1]
-
-    //     particle = new Particle({ x, y })
-    //     particles.push(particle)
-    // }
-
     return ({ context, width, height }) => {
         context.fillStyle = 'black'
         context.fillRect(0, 0, width, height)
+
+        // ปกติอันไหนวาดทีหลังก็จะอยู่ layer บนกว่า แต่เราต้องการให้ particle ที่ใหญ่กว่าอยู่ด้านบน เลยต้อง sort อีกที
+        particles.sort((a, b) => a.scale - b.scale)
 
         particles.forEach((particle) => {
             particle.update()
@@ -121,6 +116,8 @@ class Particle {
         this.iy = y
 
         this.radius = radius
+        this.scale = 1
+        this.color = colors[0]
 
         // ระยะห่างระหว่าง particle และ cursor น้อยสุดที่จะทำให้ particle ไม่เคลื่อนที่
         this.minDist = random.range(100, 200)
@@ -132,12 +129,21 @@ class Particle {
 
     update() {
         let dx, dy, dd, distDelta
+        let idxColor
 
         // pull force
         dx = this.ix - this.x
         dy = this.iy - this.y
+        dd = Math.sqrt(dx * dx + dy * dy)
+
         this.ax = dx * this.pullFactor
         this.ay = dy * this.pullFactor
+
+        this.scale = math.mapRange(dd, 0, 200, 1, 5)
+        idxColor = Math.floor(
+            math.mapRange(dd, 0, 200, 0, colors.length - 1, true)
+        )
+        this.color = colors[idxColor]
 
         // push force
         dx = this.x - cursor.x
@@ -167,9 +173,9 @@ class Particle {
     draw(context) {
         context.save()
         context.translate(this.x, this.y)
-        context.fillStyle = 'white'
+        context.fillStyle = this.color
         context.beginPath()
-        context.arc(0, 0, this.radius, 0, Math.PI * 2)
+        context.arc(0, 0, this.radius * this.scale, 0, Math.PI * 2)
         context.fill()
         context.restore()
     }
