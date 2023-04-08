@@ -3,6 +3,7 @@ const random = require('canvas-sketch-util/random')
 const math = require('canvas-sketch-util/math')
 const eases = require('eases')
 const colormap = require('colormap')
+const interpolate = require('color-interpolate')
 
 const settings = {
     dimensions: [1080, 1080],
@@ -16,12 +17,42 @@ const colors = colormap({
     nshades: 20,
 })
 let elCanvas
+let imgA, imgB
 
 const sketch = ({ width, height, canvas }) => {
     let x, y, particle, radius
-    const numCircles = 15 // จำนวนวงกลมจากจุดศูนย์กลาง
-    const gapCircle = 8
-    const gapDot = 4
+
+    const imgACanvas = document.createElement('canvas')
+    const imgAContext = imgACanvas.getContext('2d')
+
+    const imgBCanvas = document.createElement('canvas')
+    const imgBContext = imgBCanvas.getContext('2d')
+
+    imgACanvas.width = imgA.width
+    imgACanvas.height = imgA.height
+
+    imgBCanvas.width = imgB.width
+    imgBCanvas.height = imgB.height
+
+    imgAContext.drawImage(imgA, 0, 0)
+    imgBContext.drawImage(imgB, 0, 0)
+
+    const imgAData = imgAContext.getImageData(
+        0,
+        0,
+        imgA.width,
+        imgA.height
+    ).data
+    const imgBData = imgBContext.getImageData(
+        0,
+        0,
+        imgB.width,
+        imgB.height
+    ).data
+
+    const numCircles = 30 // จำนวนวงกลมจากจุดศูนย์กลาง
+    const gapCircle = 2
+    const gapDot = 2
     let dotRadius = 12
     let cirRadius = 0
     const fitRadius = dotRadius
@@ -40,6 +71,8 @@ const sketch = ({ width, height, canvas }) => {
             : 1
         // คำนวนหามุมในหน่วย radius ที่วงกลมแต่ละวงจะใช้
         const fitSlice = (Math.PI * 2) / numFit
+        let ix, iy, idx, r, g, b, colA, colB, colMap // colMap ใช้ทำสี particle ตอนเลื่อน mouse
+
         for (let j = 0; j < numFit; j++) {
             const theta = fitSlice * j
             x = Math.cos(theta) * cirRadius
@@ -48,9 +81,34 @@ const sketch = ({ width, height, canvas }) => {
             x += width * 0.5
             y += height * 0.5
 
-            radius = dotRadius
+            // (x / width) คือการหาจุดที่จะ map สีบน canvas ใหญ่
+            // และเอามาคูณกับ imgA.width เพื่อเทียบว่าอยู่ที่จุดไหนบน canvas เล็ก
+            // ถ้า imgA และ imgB มีขนาด width, height เท่ากัน ไม่ต้องคำนวนใหม่
+            ix = Math.floor((x / width) * imgA.width)
+            iy = Math.floor((y / height) * imgA.height)
+            // คำนวนหาว่าอยู่ index ไหนใน array (imgAData)
+            // หา rgb ของ imgA
+            idx = (iy * imgA.width + ix) * 4
+            r = imgAData[idx]
+            g = imgAData[idx + 1]
+            b = imgAData[idx + 2]
+            colA = `rgb(${r}, ${g}, ${b})`
 
-            particle = new Particle({ x, y, radius })
+            // เปลี่ยนรัศมีของวงกลมเล็กตามความสว่าง
+            // ต้องคิดจาก r ของรูปหลัก
+            radius = math.mapRange(r, 0, 255, 1, 12)
+
+            // หา rgb ของ imgB
+            idx = (iy * imgB.width + ix) * 4
+            r = imgBData[idx]
+            g = imgBData[idx + 1]
+            b = imgBData[idx + 2]
+            colB = `rgb(${r}, ${g}, ${b})`
+
+            // ใช้สีจากทั้ง imgA และ imgB
+            colMap = interpolate([colA, colB])
+
+            particle = new Particle({ x, y, radius, colMap })
             particles.push(particle)
         }
 
@@ -64,6 +122,8 @@ const sketch = ({ width, height, canvas }) => {
     return ({ context, width, height }) => {
         context.fillStyle = 'black'
         context.fillRect(0, 0, width, height)
+
+        context.drawImage(imgACanvas, 0, 0)
 
         // ปกติอันไหนวาดทีหลังก็จะอยู่ layer บนกว่า แต่เราต้องการให้ particle ที่ใหญ่กว่าอยู่ด้านบน เลยต้อง sort อีกที
         particles.sort((a, b) => a.scale - b.scale)
@@ -98,10 +158,27 @@ const onMouseUp = () => {
     cursor.y = 9999
 }
 
-canvasSketch(sketch, settings)
+const loadImage = async (url) => {
+    return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.onerror = () => reject()
+        img.src = url
+    })
+}
+
+const start = async () => {
+    // imgA ใช้เป็นรูป main ในการ map สี
+    imgA = await loadImage('../resources/images/image-01.jpg')
+    // imgB จะมีการใช้สีเมื่อเลื่อน mouse
+    imgB = await loadImage('../resources/images/image-02.jpg')
+    canvasSketch(sketch, settings)
+}
+
+start()
 
 class Particle {
-    constructor({ x, y, radius = 10 }) {
+    constructor({ x, y, radius = 10, colMap }) {
         // position
         this.x = x
         this.y = y
@@ -117,7 +194,8 @@ class Particle {
 
         this.radius = radius
         this.scale = 1
-        this.color = colors[0]
+        this.colMap = colMap
+        this.color = colMap(0)
 
         // ระยะห่างระหว่าง particle และ cursor น้อยสุดที่จะทำให้ particle ไม่เคลื่อนที่
         this.minDist = random.range(100, 200)
@@ -140,10 +218,13 @@ class Particle {
         this.ay = dy * this.pullFactor
 
         this.scale = math.mapRange(dd, 0, 200, 1, 5)
-        idxColor = Math.floor(
-            math.mapRange(dd, 0, 200, 0, colors.length - 1, true)
-        )
-        this.color = colors[idxColor]
+        // idxColor = Math.floor(
+        //     math.mapRange(dd, 0, 200, 0, colors.length - 1, true)
+        // )
+        // this.color = colors[idxColor]
+
+        // มีการเปลี่ยนไปใช้สีของ imgA และ imgB โดยขึ้นกับระยะห่างระหว่างจุดกับ mouse
+        this.color = this.colMap(math.mapRange(dd, 0, 200, 0, 1, true))
 
         // push force
         dx = this.x - cursor.x
