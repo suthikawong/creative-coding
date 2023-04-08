@@ -1,4 +1,6 @@
 const canvasSketch = require('canvas-sketch')
+const random = require('canvas-sketch-util/random')
+const eases = require('eases')
 
 const settings = {
     dimensions: [1080, 1080],
@@ -10,17 +12,62 @@ const cursor = { x: 9999, y: 9999 }
 let elCanvas
 
 const sketch = ({ width, height, canvas }) => {
-    let x, y, particle
+    let x, y, particle, radius
+    let pos = []
+    const numCircles = 15 // จำนวนวงกลมจากจุดศูนย์กลาง
+    const gapCircle = 8
+    const gapDot = 4
+    let dotRadius = 12
+    let cirRadius = 0
+    const fitRadius = dotRadius
+
     elCanvas = canvas
     canvas.addEventListener('mousedown', onMouseDown)
 
-    for (let i = 0; i < 1; i++) {
-        x = width * 0.5
-        y = height * 0.5
+    for (let i = 0; i < numCircles; i++) {
+        // หาเล้นรอบวงของวงกลม
+        const circumference = Math.PI * 2 * cirRadius
+        // คำนวนหาจำนวนของวงกลมเต็มวงมากสุดที่สามารถอยู่ในเส้นรอบวงของวงกลมใหญ่ได้
+        // i = 0 คือวงกลมที่จุดศูนย์กลาง
+        // gapDot คือระยะห่างของแต่ละจุดในรัศมีขนาดเดียวกัน
+        const numFit = i
+            ? Math.floor(circumference / (fitRadius * 2 + gapDot))
+            : 1
+        // คำนวนหามุมในหน่วย radius ที่วงกลมแต่ละวงจะใช้
+        const fitSlice = (Math.PI * 2) / numFit
+        for (let j = 0; j < numFit; j++) {
+            const theta = fitSlice * j
+            x = Math.cos(theta) * cirRadius
+            y = Math.sin(theta) * cirRadius
 
-        particle = new Particle({ x, y })
-        particles.push(particle)
+            x += width * 0.5
+            y += height * 0.5
+
+            radius = dotRadius
+
+            particle = new Particle({ x, y, radius })
+            particles.push(particle)
+        }
+
+        // เพิ่มรัศมีขึ้นครั้งละ 24 จากจุดศูนย์กลาง (filRadius) และบวกช่องว่างในแต่ละชั้นของวงกลม
+        cirRadius += fitRadius * 2 + gapCircle
+        // ใส่ 1 - เพื่อกลับทิศให้วงกลมใหญ่อยู่ข้างในวงกลมเล็กอยู่ข้างนอก
+        // ทำให้ไม่เป็น linear โดยการใช้ quadOut
+        dotRadius = (1 - eases.quadOut(i / numCircles)) * fitRadius
     }
+
+    // for (let i = 0; i < 200; i++) {
+    //     x = width * 0.5
+    //     y = height * 0.5
+
+    //     // สุ่มตำแหน่งที่อยู่ภายในวงกลมรัศมี 400 โดยจะคืนเป็น [x, y]
+    //     random.insideCircle(400, pos)
+    //     x += pos[0]
+    //     y += pos[1]
+
+    //     particle = new Particle({ x, y })
+    //     particles.push(particle)
+    // }
 
     return ({ context, width, height }) => {
         context.fillStyle = 'black'
@@ -76,11 +123,11 @@ class Particle {
         this.radius = radius
 
         // ระยะห่างระหว่าง particle และ cursor น้อยสุดที่จะทำให้ particle ไม่เคลื่อนที่
-        this.minDist = 100
+        this.minDist = random.range(100, 200)
 
-        this.pushFactor = 0.02 // ตัวคูณที่ทำให้ความเร่งลดลง
-        this.pullFactor = 0.004
-        this.dumpFactor = 0.95
+        this.pushFactor = random.range(0.01, 0.02) // ตัวคูณที่ทำให้ความเร่งลดลง
+        this.pullFactor = random.range(0.002, 0.006)
+        this.dumpFactor = random.range(0.9, 0.95)
     }
 
     update() {
